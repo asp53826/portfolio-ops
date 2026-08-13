@@ -41,7 +41,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: asp53826/portfolio-ops
-          ref: v1.0.0
+          ref: v1.2.0
           path: .portfolio-ops
           persist-credentials: false
       - name: Set up Python
@@ -68,8 +68,8 @@ jobs:
           BENCHMARK_COMMAND: ${{ inputs.benchmark-command }}
         run: |
           set -o pipefail
-          mkdir -p .portfolio-evidence
-          bash -eo pipefail -c "$BENCHMARK_COMMAND" 2>&1 | tee .portfolio-evidence/benchmark.log
+          mkdir -p portfolio-evidence
+          bash -eo pipefail -c "$BENCHMARK_COMMAND" 2>&1 | tee portfolio-evidence/benchmark.log
       - name: Record benchmark evidence
         if: always()
         run: >-
@@ -77,12 +77,12 @@ jobs:
           --kind benchmark
           --command "${{ inputs.benchmark-command }}"
           --result "${{ job.status }}"
-          --output .portfolio-evidence/benchmark.json
+          --output portfolio-evidence/benchmark.json
       - name: Preserve benchmark evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: benchmark-${{ github.event.repository.name }}-${{ github.run_id }}
-          path: .portfolio-evidence
+          path: portfolio-evidence
           if-no-files-found: error
           retention-days: 90

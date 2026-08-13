@@ -43,7 +43,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: asp53826/portfolio-ops
-          ref: v1.0.0
+          ref: v1.2.0
           path: .portfolio-ops
           persist-credentials: false
       - name: Set up Python
@@ -77,12 +77,12 @@ jobs:
           --kind repo-medic
           --command "${{ inputs.test-command }}"
           --result "${{ job.status }}"
-          --output .portfolio-evidence/repo-medic.json
+          --output portfolio-evidence/repo-medic.json
       - name: Preserve verification evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: repo-medic-${{ github.run_id }}
-          path: .portfolio-evidence
+          path: portfolio-evidence
           if-no-files-found: error
           retention-days: 30
