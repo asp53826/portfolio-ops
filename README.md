@@ -14,6 +14,7 @@ commits, stars, follows, reviews, issues, pull requests, or community answers.
 | bot | responsibility | mutation policy |
 |---|---|---|
 | Repo Medic | re-run a repository's real tests and build commands | read-only |
+| Claim Auditor | re-run the experiment behind every numeric claim the repository publishes | one tracked issue on failure |
 | Benchmark Keeper | run declared benchmarks and retain logs plus runner metadata | artifact upload only |
 | Dependency Caretaker | classify Dependabot updates and merge eligible patches after CI | patch releases only; full PR check set must pass |
 | Documentation Scribe | validate repository-local documentation links | one tracked issue on failure |
@@ -46,6 +47,45 @@ jobs:
 Consumer workflows should pin a release tag or commit. Commands are declared
 in each project so the automation cannot silently replace a repository's own
 definition of correctness.
+
+## Declaring claims
+
+Claim Auditor only audits what a repository declares in `claims.toml`. It never
+infers a claim from prose, and a claim it cannot find is a failure rather than a
+silent skip.
+
+```toml
+[[claim]]
+id = "digital-delta-is-zero"
+statement = "pathwise AAD, sharp payoff | 0.000000 | 100.0%"
+document = "README.md"           # default: README.md
+command = "uv run python bench/measure.py"
+pattern = "sharp payoff\\s+([0-9.]+)"
+expected = 0.0                   # or: min / max for a shape claim
+tolerance = 1e-9                 # or: tolerance_pct for noisy measurements
+```
+
+Every claim carries two halves. `statement` is checked verbatim against the
+document that publishes it, with whitespace normalised so a wrapped Markdown
+sentence still matches — that is what stops the manifest from drifting away from
+the prose a reader actually sees. `command` plus `pattern` (one capture group) or
+`json_path` (dotted, list indices allowed) re-derives the number.
+
+Use `expected` with `tolerance` for deterministic quantities, `tolerance_pct` for
+wall-clock measurements, and `min`/`max` when the claim is about a shape rather
+than a point — "flat between 1.7 and 2.4" is a bound, not a value.
+
+Run it locally before pushing:
+
+```bash
+python3 scripts/claim_auditor.py --root ../my-project --check-only   # statements only
+python3 scripts/claim_auditor.py --root ../my-project --only speedup # one claim
+```
+
+The workflow executes commands the calling repository declares, so callers must
+invoke it on `schedule`, `workflow_dispatch`, or push to a protected branch. It
+refuses to run on `pull_request` and `pull_request_target`, where a fork could
+rewrite `claims.toml` into an arbitrary command.
 
 ## Operating rules
 
