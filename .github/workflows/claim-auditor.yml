@@ -140,6 +140,10 @@ jobs:
         with:
           name: claim-audit-${{ github.run_id }}
           path: .portfolio-evidence
+          # .portfolio-evidence is a dotfile directory, and upload-artifact
+          # skips hidden paths by default -- without this the upload finds
+          # nothing and fails the job even when every claim passed.
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 90
       - name: Fail after recording the issue
