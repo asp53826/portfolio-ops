@@ -56,7 +56,10 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: asp53826/portfolio-ops
-          ref: v1.4.0
+          # Pinned to the commit that introduced these scripts, which is
+          # immutable and contains exactly the reviewed versions. Switch both
+          # this and the consumers' `uses:` to v1.4.0 once that tag is cut.
+          ref: 41f890386a0f7b6707336f54575d03da12da7035
           path: .portfolio-ops
           persist-credentials: false
       - name: Set up Python
