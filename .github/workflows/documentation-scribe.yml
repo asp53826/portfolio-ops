@@ -1,0 +1,63 @@
+name: Documentation Scribe
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  documentation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out caller repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Check out portfolio control scripts
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: asp53826/portfolio-ops
+          ref: v1.0.0
+          path: .portfolio-ops
+          persist-credentials: false
+      - name: Audit local documentation links
+        id: audit
+        continue-on-error: true
+        run: python3 .portfolio-ops/scripts/docs_scribe.py --root . --report .portfolio-evidence/docs-health.json
+      - name: Open or update the documentation health issue
+        if: steps.audit.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: "[bot] Documentation health regression"
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          issue=$(gh issue list --state open --search "$TITLE in:title" --json number --jq '.[0].number // empty')
+          body="Documentation Scribe found one or more invalid repository-local links. Evidence: $RUN_URL"
+          if [ -n "$issue" ]; then
+            gh issue edit "$issue" --body "$body"
+          else
+            gh issue create --title "$TITLE" --body "$body" --label documentation
+          fi
+      - name: Close recovered documentation issue
+        if: steps.audit.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: "[bot] Documentation health regression"
+        run: |
+          issue=$(gh issue list --state open --search "$TITLE in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$issue" ]; then
+            gh issue close "$issue" --comment "Documentation Scribe verified recovery in run $GITHUB_RUN_ID."
+          fi
+      - name: Preserve documentation report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: documentation-health-${{ github.run_id }}
+          path: .portfolio-evidence/docs-health.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Fail after recording the issue
+        if: steps.audit.outcome == 'failure'
+        run: exit 1

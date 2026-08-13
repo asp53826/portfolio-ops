@@ -1,0 +1,88 @@
+name: Repo Medic
+
+on:
+  workflow_call:
+    inputs:
+      runtime:
+        description: python, node or cpp
+        required: true
+        type: string
+      runtime-version:
+        required: false
+        default: "3.12"
+        type: string
+      install-command:
+        required: false
+        default: ""
+        type: string
+      test-command:
+        required: true
+        type: string
+      verification-command:
+        required: false
+        default: ""
+        type: string
+      timeout-minutes:
+        required: false
+        default: 30
+        type: number
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    steps:
+      - name: Check out caller repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Check out portfolio control scripts
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: asp53826/portfolio-ops
+          ref: v1.0.0
+          path: .portfolio-ops
+          persist-credentials: false
+      - name: Set up Python
+        if: inputs.runtime == 'python'
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: ${{ inputs.runtime-version }}
+      - name: Set up Node.js
+        if: inputs.runtime == 'node'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ inputs.runtime-version }}
+      - name: Install project
+        if: inputs.install-command != ''
+        env:
+          INSTALL_COMMAND: ${{ inputs.install-command }}
+        run: bash -eo pipefail -c "$INSTALL_COMMAND"
+      - name: Run repository tests
+        env:
+          TEST_COMMAND: ${{ inputs.test-command }}
+        run: bash -eo pipefail -c "$TEST_COMMAND"
+      - name: Run repository verification
+        if: inputs.verification-command != ''
+        env:
+          VERIFICATION_COMMAND: ${{ inputs.verification-command }}
+        run: bash -eo pipefail -c "$VERIFICATION_COMMAND"
+      - name: Record verification evidence
+        if: always()
+        run: >-
+          python3 .portfolio-ops/scripts/evidence_manifest.py
+          --kind repo-medic
+          --command "${{ inputs.test-command }}"
+          --result "${{ job.status }}"
+          --output .portfolio-evidence/repo-medic.json
+      - name: Preserve verification evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: repo-medic-${{ github.run_id }}
+          path: .portfolio-evidence
+          if-no-files-found: error
+          retention-days: 30

@@ -1,0 +1,43 @@
+name: Achievement Scout
+
+on:
+  schedule:
+    - cron: "41 7 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: achievement-scout
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out control plane
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Verify public achievement state
+        id: scout
+        run: python3 scripts/achievement_scout.py --user asp53826 --state state/achievements.json
+      - name: Commit verified state change
+        if: steps.scout.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add state/achievements.json
+          git commit -m "Record verified GitHub achievement change [skip ci]"
+          git push
+      - name: Open one achievement notification
+        if: steps.scout.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ADDED: ${{ steps.scout.outputs.added }}
+          REMOVED: ${{ steps.scout.outputs.removed }}
+        run: |
+          gh issue create \
+            --title "[bot] Verified GitHub achievement change" \
+            --body "Achievement Scout verified a public profile change. Added: ${ADDED:-none}. Removed: ${REMOVED:-none}. Source: https://github.com/asp53826?tab=achievements" \
+            --label automation

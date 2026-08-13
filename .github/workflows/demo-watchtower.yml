@@ -1,0 +1,70 @@
+name: Demo Watchtower
+
+on:
+  workflow_call:
+    inputs:
+      urls:
+        description: One public URL per line
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out caller repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Check out portfolio control scripts
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: asp53826/portfolio-ops
+          ref: v1.0.0
+          path: .portfolio-ops
+          persist-credentials: false
+      - name: Probe configured endpoints
+        id: probe
+        continue-on-error: true
+        env:
+          WATCH_URLS: ${{ inputs.urls }}
+        run: python3 .portfolio-ops/scripts/demo_watchtower.py --report .portfolio-evidence/demo-health.json
+      - name: Open or update the demo health issue
+        if: steps.probe.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: "[bot] Public demo health regression"
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          issue=$(gh issue list --state open --search "$TITLE in:title" --json number --jq '.[0].number // empty')
+          body="Demo Watchtower failed after three attempts. Evidence: $RUN_URL"
+          if [ -n "$issue" ]; then
+            gh issue edit "$issue" --body "$body"
+          else
+            gh issue create --title "$TITLE" --body "$body" --label bug
+          fi
+      - name: Close recovered demo issue
+        if: steps.probe.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: "[bot] Public demo health regression"
+        run: |
+          issue=$(gh issue list --state open --search "$TITLE in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$issue" ]; then
+            gh issue close "$issue" --comment "Demo Watchtower verified recovery in run $GITHUB_RUN_ID."
+          fi
+      - name: Preserve demo report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: demo-health-${{ github.run_id }}
+          path: .portfolio-evidence/demo-health.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Fail after recording the issue
+        if: steps.probe.outcome == 'failure'
+        run: exit 1

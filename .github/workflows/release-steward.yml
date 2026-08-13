@@ -1,0 +1,68 @@
+name: Release Steward
+
+on:
+  workflow_call:
+    inputs:
+      verify-command:
+        required: true
+        type: string
+      runtime:
+        required: true
+        type: string
+      runtime-version:
+        required: false
+        default: "3.12"
+        type: string
+      install-command:
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        if: inputs.runtime == 'python'
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: ${{ inputs.runtime-version }}
+      - name: Set up Node.js
+        if: inputs.runtime == 'node'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ inputs.runtime-version }}
+      - name: Install project
+        if: inputs.install-command != ''
+        env:
+          INSTALL_COMMAND: ${{ inputs.install-command }}
+        run: bash -eo pipefail -c "$INSTALL_COMMAND"
+      - name: Verify tagged revision
+        env:
+          VERIFY_COMMAND: ${{ inputs.verify-command }}
+        run: bash -eo pipefail -c "$VERIFY_COMMAND"
+      - name: Package source and checksums
+        run: |
+          mkdir -p dist
+          name="${GITHUB_REPOSITORY#*/}-${GITHUB_REF_NAME}-source.tar.gz"
+          git archive --format=tar.gz --prefix="${GITHUB_REPOSITORY#*/}-${GITHUB_REF_NAME}/" -o "dist/$name" HEAD
+          cd dist
+          sha256sum "$name" > SHA256SUMS
+      - name: Attest source package
+        uses: actions/attest-build-provenance@96b4a1ef7235a096b17240c259729fdd70c83d45 # v2
+        with:
+          subject-path: dist/*.tar.gz
+      - name: Publish verified release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --verify-tag --generate-notes --title "${GITHUB_REF_NAME}"
