@@ -1,0 +1,60 @@
+name: Profile Curator
+
+on:
+  workflow_call:
+    inputs:
+      owner:
+        required: true
+        type: string
+      repositories:
+        required: true
+        type: string
+      readme-path:
+        required: false
+        type: string
+        default: README.md
+
+permissions: {}
+
+jobs:
+  curate:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out profile repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Check out Portfolio Ops scripts
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: asp53826/portfolio-ops
+          ref: v1.3.0
+          path: portfolio-ops-tools
+          persist-credentials: false
+      - name: Refresh verified profile status
+        id: curator
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          OWNER: ${{ inputs.owner }}
+          REPOSITORIES: ${{ inputs.repositories }}
+          README_PATH: ${{ inputs.readme-path }}
+        run: |
+          python3 portfolio-ops-tools/scripts/profile_curator.py \
+            --owner "$OWNER" \
+            --repos "$REPOSITORIES" \
+            --readme "$README_PATH"
+          if git diff --quiet -- "$README_PATH"; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Commit verified profile change
+        if: steps.curator.outputs.changed == 'true'
+        env:
+          README_PATH: ${{ inputs.readme-path }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$README_PATH"
+          git commit -m "Refresh verified portfolio status [skip ci]"
+          git push

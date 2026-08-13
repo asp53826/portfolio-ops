@@ -20,6 +20,7 @@ commits, stars, follows, reviews, issues, pull requests, or community answers.
 | Demo Watchtower | probe explicitly listed public endpoints | one tracked issue on failure |
 | Release Steward | verify a tag, package source, checksum and attest it | publishes only for an explicit `v*` tag |
 | Achievement Scout | detect changes on the owner's public achievement page | updates local state and opens one notification issue |
+| Profile Curator | refresh a marked README block from live repository, release and workflow data | commits only when verified facts change |
 
 ## Consumer example
 
