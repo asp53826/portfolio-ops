@@ -9,7 +9,8 @@ alter the owner's contribution graph.
 ## Allowed autonomous changes
 
 - deterministic generated documentation and telemetry;
-- patch-level Dependabot updates after all repository checks pass;
+- patch-level Dependabot updates after the primary CI workflow and complete
+  pull-request check set pass;
 - issue creation, update and closure inside repositories owned by `asp53826`;
 - releases that are explicitly initiated by pushing a signed or intentional
   `v*` tag;

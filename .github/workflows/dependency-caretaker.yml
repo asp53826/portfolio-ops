@@ -4,7 +4,6 @@ on:
   workflow_call:
 
 permissions:
-  contents: write
   pull-requests: write
 
 jobs:
@@ -17,12 +16,17 @@ jobs:
         uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
         with:
           github-token: ${{ github.token }}
-      - name: Enable auto-merge for patch updates
+      - name: Mark patch updates as eligible after CI
         if: steps.metadata.outputs.update-type == 'version-update:semver-patch'
         env:
           GH_TOKEN: ${{ github.token }}
           PR_URL: ${{ github.event.pull_request.html_url }}
-        run: gh pr merge --auto --squash "$PR_URL"
-      - name: Explain retained updates
+        run: gh pr edit "$PR_URL" --add-label "automerge:patch"
+      - name: Remove eligibility from retained updates
         if: steps.metadata.outputs.update-type != 'version-update:semver-patch'
-        run: echo "${{ steps.metadata.outputs.update-type }} remains human-reviewed"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          gh pr edit "$PR_URL" --remove-label "automerge:patch" 2>/dev/null || true
+          echo "${{ steps.metadata.outputs.update-type }} remains human-reviewed"

@@ -15,7 +15,7 @@ commits, stars, follows, reviews, issues, pull requests, or community answers.
 |---|---|---|
 | Repo Medic | re-run a repository's real tests and build commands | read-only |
 | Benchmark Keeper | run declared benchmarks and retain logs plus runner metadata | artifact upload only |
-| Dependency Caretaker | process Dependabot updates | patch releases may auto-merge after required checks |
+| Dependency Caretaker | classify Dependabot updates and merge eligible patches after CI | patch releases only; full PR check set must pass |
 | Documentation Scribe | validate repository-local documentation links | one tracked issue on failure |
 | Demo Watchtower | probe explicitly listed public endpoints | one tracked issue on failure |
 | Release Steward | verify a tag, package source, checksum and attest it | publishes only for an explicit `v*` tag |
@@ -51,6 +51,8 @@ definition of correctness.
 
 - Permissions are denied by default and granted per job.
 - Pull-request automation never checks out or executes Dependabot PR code.
+- Patch dependency updates are labeled first, then merged by a separate
+  post-CI workflow only after the complete pull-request check set passes.
 - Major and minor dependency upgrades remain human-reviewed.
 - Failures are deduplicated into a single issue and closed on recovery.
 - Benchmarks retain commands, commits, runner identity and raw output.
