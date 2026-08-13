@@ -28,7 +28,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: asp53826/portfolio-ops
-          ref: v1.3.0
+          ref: v1.3.1
           path: portfolio-ops-tools
           persist-credentials: false
       - name: Refresh verified profile status

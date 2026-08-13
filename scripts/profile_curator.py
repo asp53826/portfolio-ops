@@ -15,6 +15,7 @@ from typing import Any
 
 START = "<!-- portfolio-status:start -->"
 END = "<!-- portfolio-status:end -->"
+HOUSEKEEPING_WORKFLOW_TERMS = ("codeql", "pages build", "configured graph")
 
 
 def request_json(url: str, token: str) -> Any:
@@ -39,6 +40,30 @@ def optional_json(url: str, token: str) -> Any | None:
         raise
 
 
+def is_dependabot_run(run: dict[str, Any]) -> bool:
+    actor = run.get("actor") or {}
+    return (
+        run.get("event") == "dynamic"
+        or str(run.get("path", "")).startswith("dynamic/dependabot/")
+        or actor.get("login") == "dependabot[bot]"
+    )
+
+
+def select_workflow(runs: list[dict[str, Any]]) -> dict[str, Any] | None:
+    engineering_runs = [run for run in runs if not is_dependabot_run(run)]
+    return next(
+        (
+            run
+            for run in engineering_runs
+            if not any(
+                term in str(run.get("name", "")).lower()
+                for term in HOUSEKEEPING_WORKFLOW_TERMS
+            )
+        ),
+        engineering_runs[0] if engineering_runs else None,
+    )
+
+
 def repo_record(owner: str, name: str, token: str) -> dict[str, Any] | None:
     slug = f"{owner}/{name}"
     base = f"https://api.github.com/repos/{urllib.parse.quote(owner)}/{urllib.parse.quote(name)}"
@@ -52,11 +77,7 @@ def repo_record(owner: str, name: str, token: str) -> dict[str, Any] | None:
         "&status=completed&per_page=20",
         token,
     ).get("workflow_runs", [])
-    ignored = ("codeql", "pages build", "configured graph")
-    workflow = next(
-        (run for run in runs if not any(term in run.get("name", "").lower() for term in ignored)),
-        runs[0] if runs else None,
-    )
+    workflow = select_workflow(runs)
     return {
         "slug": slug,
         "url": repository["html_url"],
