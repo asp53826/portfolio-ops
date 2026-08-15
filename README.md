@@ -15,6 +15,7 @@ commits, stars, follows, reviews, issues, pull requests, or community answers.
 |---|---|---|
 | Repo Medic | re-run a repository's real tests and build commands | read-only |
 | Claim Auditor | re-run the experiment behind every numeric claim the repository publishes | one tracked issue on failure |
+| Quickstart Rehearsal | check the published instructions actually produce the published numbers | one tracked issue on failure |
 | Benchmark Keeper | run declared benchmarks and retain logs plus runner metadata | artifact upload only |
 | Dependency Caretaker | classify Dependabot updates and merge eligible patches after CI | patch releases only; full PR check set must pass |
 | Documentation Scribe | validate repository-local documentation links | one tracked issue on failure |
@@ -87,6 +88,37 @@ The workflow executes commands the calling repository declares, so callers must
 invoke it on `schedule`, `workflow_dispatch`, or push to a protected branch. It
 refuses to run on `pull_request` and `pull_request_target`, where a fork could
 rewrite `claims.toml` into an arbitrary command.
+
+## Reproducible instructions
+
+Claim Auditor binds a sentence to a command in `claims.toml`. Nothing binds
+either to the commands the README tells a reader to run, and that gap is real:
+`cdcl-sat` published a table measured at 300 instances and 120 variables while
+its "Verify it" block said `make proof-test`, which defaults to 60 instances at
+90 variables. Every claim passed and the documented reproduction produced
+different numbers than the documented table.
+
+Quickstart Rehearsal closes the triangle. Every command an audited claim
+depends on must appear verbatim in a fenced block of the document that
+publishes it:
+
+```yaml
+uses: asp53826/portfolio-ops/.github/workflows/quickstart-rehearsal.yml@<ref>
+with:
+  sections: |
+    Verify it
+```
+
+Commands are matched after normalising whitespace, line continuations, shell
+prompts and trailing comments, and `a && b` matches either the whole line or
+its parts. A command that is genuinely not reader-facing declares
+`undocumented_reason = "..."` on the claim; the reason is required and blank
+ones are rejected, so an exemption costs a sentence of justification rather
+than a silent flag.
+
+The check is pure string comparison -- it never executes anything from the
+manifest or the document -- so unlike Claim Auditor it is safe on pull
+requests.
 
 ## Operating rules
 
