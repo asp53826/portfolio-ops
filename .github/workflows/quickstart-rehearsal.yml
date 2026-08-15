@@ -1,0 +1,128 @@
+name: Quickstart Rehearsal
+
+# Static check only: it reads the manifest and the document and compares
+# strings. It never executes a command from either, so unlike Claim Auditor it
+# is safe to run on pull requests.
+
+on:
+  workflow_call:
+    inputs:
+      manifest:
+        description: path to the claim manifest, relative to the repository root
+        required: false
+        default: claims.toml
+        type: string
+      document:
+        description: the document whose instructions must reproduce its numbers
+        required: false
+        default: README.md
+        type: string
+      sections:
+        description: newline-separated headings to scope the search to
+        required: false
+        default: ""
+        type: string
+      timeout-minutes:
+        required: false
+        default: 10
+        type: number
+
+permissions:
+  contents: read
+
+jobs:
+  rehearse:
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Check out caller repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Check out portfolio control scripts
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: asp53826/portfolio-ops
+          ref: f9112cb5af07b6822330e0b3bf4e4acf9fa7059c
+          path: .portfolio-ops
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+      - name: Check the published instructions produce the published numbers
+        id: rehearsal
+        continue-on-error: true
+        env:
+          MANIFEST: ${{ inputs.manifest }}
+          DOCUMENT: ${{ inputs.document }}
+          SECTIONS: ${{ inputs.sections }}
+        run: |
+          args=(--root . --manifest "$MANIFEST" --document "$DOCUMENT"
+                --report .portfolio-evidence/quickstart-rehearsal.json)
+          while IFS= read -r heading; do
+            [ -n "$heading" ] && args+=(--section "$heading")
+          done <<< "$SECTIONS"
+          python3 .portfolio-ops/scripts/quickstart_rehearsal.py "${args[@]}"
+      - name: Record verification evidence
+        if: always()
+        run: >-
+          python3 .portfolio-ops/scripts/evidence_manifest.py
+          --kind quickstart-rehearsal
+          --command "quickstart_rehearsal.py --document ${{ inputs.document }}"
+          --result "${{ steps.rehearsal.outcome }}"
+          --output .portfolio-evidence/quickstart-rehearsal-run.json
+      - name: Open or update the reproducibility issue
+        if: steps.rehearsal.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: "[bot] Published numbers are not reproducible from the README"
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          {
+            echo "One or more audited claims are produced by a command this repository"
+            echo "never tells a reader to run. The numbers may be correct; the"
+            echo "instructions for reproducing them are not."
+            echo
+            python3 - <<'PY'
+          import json, pathlib
+          report = json.loads(pathlib.Path(".portfolio-evidence/quickstart-rehearsal.json").read_text())
+          print("| claim | command not documented |")
+          print("|---|---|")
+          for item in report["failures"]:
+              print(f"| `{item['id']}` | `{item['command']}` |")
+          PY
+            echo
+            echo "Evidence: $RUN_URL"
+          } > body.md
+          issue=$(gh issue list --state open --search "$TITLE in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$issue" ]; then
+            gh issue edit "$issue" --body-file body.md
+          else
+            gh issue create --title "$TITLE" --body-file body.md --label automation
+          fi
+      - name: Close recovered reproducibility issue
+        if: steps.rehearsal.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: "[bot] Published numbers are not reproducible from the README"
+        run: |
+          issue=$(gh issue list --state open --search "$TITLE in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$issue" ]; then
+            gh issue close "$issue" --comment "Every audited claim is reproducible from the published instructions as of run $GITHUB_RUN_ID."
+          fi
+      - name: Preserve the rehearsal report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: quickstart-rehearsal-${{ github.run_id }}
+          path: .portfolio-evidence
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 90
+      - name: Fail after recording the issue
+        if: steps.rehearsal.outcome == 'failure'
+        run: exit 1
