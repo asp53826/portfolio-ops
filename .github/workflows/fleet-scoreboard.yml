@@ -1,0 +1,59 @@
+name: Fleet Scoreboard
+
+# Grades every public asp53826 repository from public evidence every three
+# hours and commits scoreboard/ on every run. Each commit is a check-in: it
+# records when the fleet was last graded, and the commit message says whether
+# any grade changed ("check-in: no grade changes" otherwise).
+
+on:
+  schedule:
+    - cron: "37 */3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fleet-scoreboard
+  cancel-in-progress: false
+
+jobs:
+  score:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Check out control plane
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+      - name: Grade public repositories
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: >-
+          python3 scripts/fleet_scoreboard.py
+          --owner "${GITHUB_REPOSITORY_OWNER}"
+          --out scoreboard
+          --work-dir "${RUNNER_TEMP}/fleet"
+          --message-file "${RUNNER_TEMP}/scoreboard-message.txt"
+      - name: Commit the check-in
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scoreboard
+          if git diff --staged --quiet; then
+            echo "scoreboard files identical; nothing to commit"
+            exit 0
+          fi
+          printf '\n[skip ci]\n' >> "${RUNNER_TEMP}/scoreboard-message.txt"
+          git commit --file "${RUNNER_TEMP}/scoreboard-message.txt"
+          for attempt in 1 2 3; do
+            git pull --rebase --quiet origin "${GITHUB_REF_NAME}" && git push && exit 0
+            sleep $((attempt * 10))
+          done
+          echo "could not push the scoreboard check-in" >&2
+          exit 1

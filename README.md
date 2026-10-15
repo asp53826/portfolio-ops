@@ -23,6 +23,7 @@ commits, stars, follows, reviews, issues, pull requests, or community answers.
 | Release Steward | verify a tag, package source, checksum and attest it | publishes only for an explicit `v*` tag |
 | Achievement Scout | detect changes on the owner's public achievement page | updates local state and opens one notification issue |
 | Profile Curator | refresh a marked README block from live repository, release and workflow data | commits only when verified facts change |
+| Fleet Scoreboard | grade every public repository every three hours from public evidence | commits a check-in to `scoreboard/` on every run; never executes scored code |
 
 ## Consumer example
 
@@ -119,6 +120,23 @@ than a silent flag.
 The check is pure string comparison -- it never executes anything from the
 manifest or the document -- so unlike Claim Auditor it is safe on pull
 requests.
+
+## Fleet Scoreboard
+
+[`scoreboard/`](scoreboard/README.md) grades every public, non-fork, non-archived
+repository out of 100: default-branch workflow results, the latest scheduled lab
+run, declared claims and their reproducibility, local documentation links,
+action pinning and permissions, and whether the latest commit uses a noreply
+address. The workflow runs every three hours and commits on every run; the
+commit message says whether any grade changed. The rubric is printed under the
+table, and every point lost is listed with its reason.
+
+Preview it locally against clones you already have (workflow and lab checks
+need the API, so they show as not checked):
+
+```bash
+python3 scripts/fleet_scoreboard.py --owner asp53826 --work-dir ../clones --offline --out /tmp/scoreboard
+```
 
 ## Operating rules
 
