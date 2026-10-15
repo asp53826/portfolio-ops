@@ -10,6 +10,8 @@ alter the owner's contribution graph.
 
 - deterministic generated documentation and telemetry;
 - deterministic profile status generated from GitHub repository, release and workflow data;
+- a Fleet Scoreboard check-in commit every three hours, recording when the fleet was
+  last graded even when no grade changed;
 - patch-level Dependabot updates after the primary CI workflow and complete
   pull-request check set pass;
 - issue creation, update and closure inside repositories owned by `asp53826`;
@@ -25,7 +27,8 @@ interactions in repositories owned by other people require human review.
 
 ## Prohibited behavior
 
-- empty or meaningless commits, issues, pull requests and reviews;
+- empty or meaningless commits, issues, pull requests and reviews (scoreboard check-ins
+  carry a timestamp and run link, and say in the message whether grades changed);
 - automated stars, follows, reactions or accepted-answer activity;
 - fake accounts, fabricated collaboration or impersonated authorship;
 - retroactive timestamp manipulation or activity-calendar painting;
